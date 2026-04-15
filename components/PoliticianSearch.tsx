@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, User, X } from 'lucide-react';
+import { Search, User, X, Loader2 } from 'lucide-react';
 import { Politician, searchPoliticians } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -86,7 +86,12 @@ export function PoliticianSearch({ onSelect, placeholder = "Buscar político..."
               onValueChange={setQuery}
             />
             <CommandList>
-              {loading && <div className="p-4 text-center text-sm text-muted-foreground">Buscando...</div>}
+              {loading && (
+                <div className="p-8 flex flex-col items-center justify-center gap-3 text-muted-foreground animate-in fade-in duration-300">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm font-medium">Buscando políticos...</p>
+                </div>
+              )}
               {!loading && query.length > 0 && query.length < 3 && (
                 <div className="p-4 text-center text-sm text-muted-foreground">Digite pelo menos 3 caracteres</div>
               )}
