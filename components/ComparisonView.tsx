@@ -80,8 +80,20 @@ export function ComparisonView({ id1, id2 }: ComparisonViewProps) {
   }
 
   const presenceData = [
-    { name: p1.name, presence: p1.presence.present },
-    { name: p2.name, presence: p2.presence.present },
+    { 
+      name: p1.name, 
+      total: p1.presence.total,
+      present: p1.presence.present,
+      absent: p1.presence.absent,
+      justified: p1.presence.justified,
+    },
+    { 
+      name: p2.name, 
+      total: p2.presence.total,
+      present: p2.presence.present,
+      absent: p2.presence.absent,
+      justified: p2.presence.justified,
+    },
   ];
 
   return (
@@ -210,32 +222,31 @@ export function ComparisonView({ id1, id2 }: ComparisonViewProps) {
         </TabsContent>
 
         <TabsContent value="presence">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             <Card className="border-2">
               <CardHeader>
-                <CardTitle className="text-lg">Comparativo de Presença</CardTitle>
+                <CardTitle className="text-lg">Comparativo Detalhado de Presença</CardTitle>
               </CardHeader>
-              <CardContent className="h-[300px]">
+              <CardContent className="h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={presenceData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis domain={[0, 100]} fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip 
                       cursor={{fill: 'transparent'}}
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                     />
-                    <Bar dataKey="presence" radius={[8, 8, 0, 0]} barSize={60}>
-                      {presenceData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.6)'} />
-                      ))}
-                    </Bar>
+                    <Bar dataKey="total" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} name="Total de Sessões" />
+                    <Bar dataKey="present" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Presenças" />
+                    <Bar dataKey="absent" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} name="Faltas" />
+                    <Bar dataKey="justified" fill="hsl(210, 100%, 50%)" radius={[4, 4, 0, 0]} name="Justificadas" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[p1, p2].map((p) => (
                 <Card key={p.id} className="border-2">
                   <CardContent className="pt-6 space-y-4">

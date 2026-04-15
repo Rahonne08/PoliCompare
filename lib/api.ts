@@ -47,37 +47,49 @@ export interface OfficeHistory {
 const CAMARA_API = 'https://dadosabertos.camara.leg.br/api/v2';
 const SENADO_API = 'https://legis.senado.leg.br/dadosabertos';
 
+async function fetchWithProxy(url: string) {
+  const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+  const res = await fetch(proxyUrl);
+  if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
+  return res.json();
+}
+
 export async function searchPoliticians(query: string): Promise<Politician[]> {
   if (!query || query.length < 3) return [];
 
-  const [deputies, senators] = await Promise.all([
-    fetch(`${CAMARA_API}/deputados?nome=${encodeURIComponent(query)}&ordem=ASC&ordenarPor=nome`).then(res => res.json()),
-    fetch(`${SENADO_API}/senador/lista/atual`).then(res => res.json())
-  ]);
+  try {
+    const [deputies, senators] = await Promise.all([
+      fetchWithProxy(`${CAMARA_API}/deputados?nome=${encodeURIComponent(query)}&ordem=ASC&ordenarPor=nome`),
+      fetchWithProxy(`${SENADO_API}/senador/lista/atual`)
+    ]);
 
-  const formattedDeputies: Politician[] = (deputies.dados || []).map((d: any) => ({
-    id: `dep-${d.id}`,
-    name: d.nome,
-    fullName: d.nome, // Detailed info needed for full name
-    party: d.siglaPartido,
-    state: d.siglaUf,
-    photoUrl: d.urlFoto,
-    type: 'deputado'
-  }));
-
-  const formattedSenators: Politician[] = (senators.ListaParlamentarAtual.Parlamentares.Parlamentar || [])
-    .filter((s: any) => s.IdentificacaoParlamentar.NomeParlamentar.toLowerCase().includes(query.toLowerCase()))
-    .map((s: any) => ({
-      id: `sen-${s.IdentificacaoParlamentar.CodigoParlamentar}`,
-      name: s.IdentificacaoParlamentar.NomeParlamentar,
-      fullName: s.IdentificacaoParlamentar.NomeCompletoParlamentar,
-      party: s.IdentificacaoParlamentar.SiglaPartidoParlamentar,
-      state: s.IdentificacaoParlamentar.UfParlamentar,
-      photoUrl: s.IdentificacaoParlamentar.UrlFotoParlamentar,
-      type: 'senador'
+    const formattedDeputies: Politician[] = (deputies.dados || []).map((d: any) => ({
+      id: `dep-${d.id}`,
+      name: d.nome,
+      fullName: d.nome,
+      party: d.siglaPartido,
+      state: d.siglaUf,
+      photoUrl: d.urlFoto,
+      type: 'deputado'
     }));
 
-  return [...formattedDeputies, ...formattedSenators].slice(0, 10);
+    const formattedSenators: Politician[] = (senators.ListaParlamentarAtual.Parlamentares.Parlamentar || [])
+      .filter((s: any) => s.IdentificacaoParlamentar.NomeParlamentar.toLowerCase().includes(query.toLowerCase()))
+      .map((s: any) => ({
+        id: `sen-${s.IdentificacaoParlamentar.CodigoParlamentar}`,
+        name: s.IdentificacaoParlamentar.NomeParlamentar,
+        fullName: s.IdentificacaoParlamentar.NomeCompletoParlamentar,
+        party: s.IdentificacaoParlamentar.SiglaPartidoParlamentar,
+        state: s.IdentificacaoParlamentar.UfParlamentar,
+        photoUrl: s.IdentificacaoParlamentar.UrlFotoParlamentar,
+        type: 'senador'
+      }));
+
+    return [...formattedDeputies, ...formattedSenators].slice(0, 10);
+  } catch (error) {
+    console.error('Search error:', error);
+    return [];
+  }
 }
 
 export async function getPoliticianDetails(id: string): Promise<Politician & { proposals: Proposal[], presence: Presence, history: OfficeHistory[], score: number }> {
@@ -85,16 +97,14 @@ export async function getPoliticianDetails(id: string): Promise<Politician & { p
   const realId = id.split('-')[1];
 
   if (isDeputado) {
-    const [details, proposals, events] = await Promise.all([
-      fetch(`${CAMARA_API}/deputados/${realId}`).then(res => res.json()),
-      fetch(`${CAMARA_API}/deputados/${realId}/propostas?ordem=DESC&ordenarPor=id`).then(res => res.json()),
-      fetch(`${CAMARA_API}/deputados/${realId}/eventos?ordem=DESC&ordenarPor=dataHoraInicio`).then(res => res.json())
+    const [details, proposals] = await Promise.all([
+      fetchWithProxy(`${CAMARA_API}/deputados/${realId}`),
+      fetchWithProxy(`${CAMARA_API}/deputados/${realId}/propostas?ordem=DESC&ordenarPor=id`)
     ]);
 
     const d = details.dados;
     const lastStatus = d.ultimoStatus;
 
-    // Mock presence for now as it's complex to calculate from events
     const presence: Presence = {
       total: 100,
       present: 85 + Math.floor(Math.random() * 10),
@@ -126,12 +136,12 @@ export async function getPoliticianDetails(id: string): Promise<Politician & { p
       education: d.escolaridade,
       proposals: formattedProposals,
       presence,
-      history: [], // Would need another API call
+      history: [],
       score
     };
   } else {
     // Senado
-    const details = await fetch(`${SENADO_API}/senador/${realId}`).then(res => res.json());
+    const details = await fetchWithProxy(`${SENADO_API}/senador/${realId}`);
     const s = details.DetalheParlamentar.Parlamentar;
     const ident = s.IdentificacaoParlamentar;
 
@@ -163,21 +173,25 @@ export async function getPoliticianDetails(id: string): Promise<Politician & { p
 
 function calculateScore(presence: Presence, proposalCount: number): number {
   const presenceRate = (presence.present / presence.total) * 100;
-  const productionScore = Math.min(proposalCount * 5, 30); // Max 30 points for production
+  const productionScore = Math.min(proposalCount * 5, 30);
   const finalScore = (presenceRate * 0.7) + productionScore;
   return Math.round(finalScore);
 }
 
 export async function getPopularPoliticians(): Promise<Politician[]> {
-  // Fetch a few known popular ones or just the first few from the list
-  const res = await fetch(`${CAMARA_API}/deputados?itens=6&ordem=ASC&ordenarPor=nome`).then(res => res.json());
-  return (res.dados || []).map((d: any) => ({
-    id: `dep-${d.id}`,
-    name: d.nome,
-    fullName: d.nome,
-    party: d.siglaPartido,
-    state: d.siglaUf,
-    photoUrl: d.urlFoto,
-    type: 'deputado'
-  }));
+  try {
+    const res = await fetchWithProxy(`${CAMARA_API}/deputados?itens=6&ordem=ASC&ordenarPor=nome`);
+    return (res.dados || []).map((d: any) => ({
+      id: `dep-${d.id}`,
+      name: d.nome,
+      fullName: d.nome,
+      party: d.siglaPartido,
+      state: d.siglaUf,
+      photoUrl: d.urlFoto,
+      type: 'deputado'
+    }));
+  } catch (error) {
+    console.error('Popular politicians error:', error);
+    return [];
+  }
 }
