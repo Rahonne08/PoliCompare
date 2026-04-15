@@ -157,6 +157,13 @@ export default function PoliticianProfilePage() {
                 <ScoreDisplay score={p.score} />
               </CardContent>
             </Card>
+
+            <Button asChild className="w-full h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all">
+              <Link href={`/compare?id1=${p.id}`}>
+                <Scale className="mr-2 h-5 w-5" />
+                Comparar Desempenho
+              </Link>
+            </Button>
           </div>
 
           <div className="space-y-8">
