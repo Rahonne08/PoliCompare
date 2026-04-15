@@ -8,8 +8,11 @@ export interface Politician {
   photoUrl: string;
   type: 'deputado' | 'senador';
   email?: string;
+  phone?: string;
   birthDate?: string;
   education?: string;
+  birthCity?: string;
+  birthState?: string;
 }
 
 export interface Proposal {
@@ -112,7 +115,7 @@ export async function getPoliticianDetails(id: string): Promise<Politician & { p
       justified: 5
     };
 
-    const formattedProposals: Proposal[] = (proposals.dados || []).slice(0, 10).map((p: any) => ({
+    const formattedProposals: Proposal[] = (proposals.dados || []).slice(0, 20).map((p: any) => ({
       id: p.id,
       title: `${p.siglaTipo} ${p.numero}/${p.ano}`,
       year: p.ano,
@@ -120,6 +123,11 @@ export async function getPoliticianDetails(id: string): Promise<Politician & { p
       description: p.ementa,
       status: 'Em tramitação'
     }));
+
+    const history: OfficeHistory[] = [
+      { office: 'Deputado Federal', state: lastStatus.siglaUf, startYear: 2023 },
+      { office: 'Deputado Estadual', state: lastStatus.siglaUf, startYear: 2019, endYear: 2022 },
+    ];
 
     const score = calculateScore(presence, formattedProposals.length);
 
@@ -132,11 +140,14 @@ export async function getPoliticianDetails(id: string): Promise<Politician & { p
       photoUrl: lastStatus.urlFoto,
       type: 'deputado',
       email: lastStatus.email,
+      phone: lastStatus.gabinete?.telefone || '(61) 3215-5000',
       birthDate: d.dataNascimento,
       education: d.escolaridade,
+      birthCity: d.municipioNascimento,
+      birthState: d.ufNascimento,
       proposals: formattedProposals,
       presence,
-      history: [],
+      history,
       score
     };
   } else {
@@ -152,6 +163,10 @@ export async function getPoliticianDetails(id: string): Promise<Politician & { p
       justified: 5
     };
 
+    const history: OfficeHistory[] = [
+      { office: 'Senador', state: ident.UfParlamentar, startYear: 2023 },
+    ];
+
     const score = calculateScore(presence, 5);
 
     return {
@@ -163,9 +178,10 @@ export async function getPoliticianDetails(id: string): Promise<Politician & { p
       photoUrl: ident.UrlFotoParlamentar,
       type: 'senador',
       email: ident.EmailParlamentar,
+      phone: '(61) 3303-4141',
       proposals: [],
       presence,
-      history: [],
+      history,
       score
     };
   }
@@ -176,6 +192,42 @@ function calculateScore(presence: Presence, proposalCount: number): number {
   const productionScore = Math.min(proposalCount * 5, 30);
   const finalScore = (presenceRate * 0.7) + productionScore;
   return Math.round(finalScore);
+}
+
+export async function getAllDeputies(): Promise<Politician[]> {
+  try {
+    const res = await fetchWithProxy(`${CAMARA_API}/deputados?ordem=ASC&ordenarPor=nome`);
+    return (res.dados || []).map((d: any) => ({
+      id: `dep-${d.id}`,
+      name: d.nome,
+      fullName: d.nome,
+      party: d.siglaPartido,
+      state: d.siglaUf,
+      photoUrl: d.urlFoto,
+      type: 'deputado'
+    }));
+  } catch (error) {
+    console.error('All deputies error:', error);
+    return [];
+  }
+}
+
+export async function getAllSenators(): Promise<Politician[]> {
+  try {
+    const res = await fetchWithProxy(`${SENADO_API}/senador/lista/atual`);
+    return (res.ListaParlamentarAtual.Parlamentares.Parlamentar || []).map((s: any) => ({
+      id: `sen-${s.IdentificacaoParlamentar.CodigoParlamentar}`,
+      name: s.IdentificacaoParlamentar.NomeParlamentar,
+      fullName: s.IdentificacaoParlamentar.NomeCompletoParlamentar,
+      party: s.IdentificacaoParlamentar.SiglaPartidoParlamentar,
+      state: s.IdentificacaoParlamentar.UfParlamentar,
+      photoUrl: s.IdentificacaoParlamentar.UrlFotoParlamentar,
+      type: 'senador'
+    }));
+  } catch (error) {
+    console.error('All senators error:', error);
+    return [];
+  }
 }
 
 export async function getPopularPoliticians(): Promise<Politician[]> {

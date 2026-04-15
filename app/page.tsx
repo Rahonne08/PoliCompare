@@ -5,7 +5,9 @@ import { PoliticianSearch } from '@/components/PoliticianSearch';
 import { PoliticianCard } from '@/components/PoliticianCard';
 import { getPopularPoliticians, Politician } from '@/lib/api';
 import { motion } from 'motion/react';
-import { Search, Scale, ShieldCheck, Users } from 'lucide-react';
+import { Search, Scale, ShieldCheck, Users, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
   const [popular, setPopular] = React.useState<Politician[]>([]);
@@ -93,6 +95,12 @@ export default function HomePage() {
               <h2 className="text-3xl font-bold tracking-tight">Políticos em Destaque</h2>
               <p className="text-muted-foreground">Explore os perfis mais buscados recentemente.</p>
             </div>
+            <Link href="/politicians">
+              <Button variant="outline" className="rounded-xl gap-2">
+                Ver Todos os Políticos
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
           </div>
 
           {loading ? (
